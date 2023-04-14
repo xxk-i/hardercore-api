@@ -1,8 +1,13 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, put};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, put};
 use serde::Deserialize;
+use std::sync::Mutex;
 
 mod db;
 use db::Database;
+
+pub struct APIData {
+    pub database: Mutex<Database>
+}
 
 #[derive(Deserialize)]
 #[allow(non_snake_case)]
@@ -18,7 +23,8 @@ struct Info {
     damageTaken: Option<u64>,
     hasDied: Option<bool>,
     mobsKilled: Option<u64>,
-    foodEaten: Option<u64>
+    foodEaten: Option<u64>,
+    experienceGained: Option<u64>
 }
 
 #[get("/")]
@@ -26,27 +32,24 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("You have reached the homepage of hardercore-api")
 }
 
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
 #[get("/world/current")]
-pub async fn get_current_world() -> impl Responder {
-    let db: Database = Database::new(std::env::current_dir().unwrap()).expect("Something went wrong creating the database");
+pub async fn get_current_world(data: web::Data<APIData>) -> impl Responder {
+    // HTTPRequest::app_data().database.get_current_world()
+    let db = data.database.lock().unwrap();
     db.get_current_world()
 }
 
 #[get("database/path")]
-pub async fn get_db_path() -> impl Responder {
-    let db: Database = Database::new(std::env::current_dir().unwrap()).expect("Something went wrong creating the database");
-    db.get_path() 
+pub async fn get_db_path(data: web::Data<APIData>) -> impl Responder {
+    let db = data.database.lock().unwrap();
+    db.get_path()
 }
 
 #[put("/world/stats")]
-async fn water(info: web::Json<Info>) -> impl Responder {
+async fn stats(data: web::Data<APIData>, info: web::Json<Info>) -> impl Responder {
+    let _db = data.database.lock().unwrap();
+
     if let Some(time) = &info.timeInWater {
-        Database::update_time_in_water(info.UUID.clone(), *time);
         println!("{}'s time spent in water: {}", info.UUID, time);
     }
 
@@ -67,12 +70,16 @@ async fn water(info: web::Json<Info>) -> impl Responder {
         println!("{} has eaten: {} food.", info.UUID, food_eaten);
     }
 
+    if let Some(experienced_gained) = &info.experienceGained {
+        println!("{} has gained: {} experience", info.UUID, experienced_gained);
+    }
+
     HttpResponse::Ok()
 }
 
 #[put("/world")]
-async fn switch_world(switch_info: web::Json<SwitchInfo>) -> impl Responder {
-    let mut db = Database::new(std::env::current_dir().unwrap()).unwrap();
+async fn switch_world(data: web::Data<APIData>, switch_info: web::Json<SwitchInfo>) -> impl Responder {
+    let db = data.database.lock().unwrap();
 
     return match db.switch_world(switch_info.world) {
         Ok(()) => {
@@ -89,9 +96,11 @@ async fn switch_world(switch_info: web::Json<SwitchInfo>) -> impl Responder {
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
+        .app_data(web::Data::new(APIData {
+            database: Mutex::new(Database::new(std::env::current_dir().unwrap()).expect("Something went wrong creating the database"))
+        }))
             .service(hello)
-            .service(echo)
-            .service(water)
+            .service(stats)
             .service(get_current_world)
             .service(get_db_path)
             .service(switch_world)

@@ -1,4 +1,4 @@
-use std::{path::{PathBuf}, fs};
+use std::{path::{PathBuf, self}, fs};
 
 use actix_web::{Responder, HttpResponse};
 
@@ -16,14 +16,16 @@ impl Database {
     pub fn new(path: PathBuf) -> Result<Self, DatabaseError> {
         let mut db_path = path.clone();
         db_path.push("db");
-        // fs::create_dir(db_path).map_err(|e| return DatabaseError);
-        fs::create_dir(db_path)?;
+
+        if !db_path.exists() {
+            fs::create_dir(db_path)?;
+        }
 
         Ok(Database { path: path, world_count: 0, current_world: 0 })
     }
 
-    pub fn update_time_in_water(uuid: String, time: u64) {
-        unimplemented!() 
+    pub fn update_time_in_water(&mut self, uuid: String, time: u64) {
+        unimplemented!()
     }
 
     pub fn get_path(&self) -> impl Responder {
@@ -34,15 +36,24 @@ impl Database {
         HttpResponse::Ok().body(self.world_count.to_string())
     }
 
+    // pub fn switch_world(&mut self, world: u64) -> Result<(), WorldNotFoundError> {
+    //     if world > self.world_count {
+    //         return Err(errors::WorldNotFoundError {
+    //             world_number: world
+    //         })
+    //     }
 
-    pub fn switch_world(&mut self, world: u64) -> Result<(), WorldNotFoundError> {
+    //     self.current_world = world;
+    //     Ok(())
+    // }
+
+    pub fn switch_world(&self, world: u64) -> Result<(), WorldNotFoundError> {
         if world > self.world_count {
             return Err(errors::WorldNotFoundError {
                 world_number: world
             })
         }
 
-        self.current_world = world;
         Ok(())
     }
 }

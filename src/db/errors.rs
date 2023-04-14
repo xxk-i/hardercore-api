@@ -1,7 +1,5 @@
-use actix_web::{error, web::Data};
+use actix_web::{error};
 use derive_more::{Display, Error};
-
-use super::Database;
 
 // Generic error for if shit goes real bad
 #[derive(Debug, Clone, Display, Error)]
