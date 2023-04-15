@@ -1,12 +1,13 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, put};
 use serde::{Deserialize, de::Expected};
+use core::time;
 use std::{sync::Mutex, fs};
 
 mod db;
 use db::Database;
 
-pub struct APIData<'a> {
-    pub database: Mutex<&'a mut Database>,
+pub struct APIData {
+    pub database: Database,
     auth: String,
 }
 
@@ -35,23 +36,25 @@ async fn hello() -> impl Responder {
 }
 
 #[get("/world/current")]
-pub async fn get_current_world(data: web::Data<APIData>) -> impl Responder {
+pub async fn get_current_world(data: web::Data<Mutex<APIData>>) -> impl Responder {
     // HTTPRequest::app_data().database.get_current_world()
-    let db = data.database.lock().unwrap();
+    println!("{:?} is getting current world", std::thread::current().id());
+    let db = &mut data.lock().unwrap().database;
     db.get_current_world()
 }
 
 #[get("database/path")]
-pub async fn get_db_path(data: web::Data<APIData>) -> impl Responder {
-    let db = data.database.lock().unwrap();
+pub async fn get_db_path(data: web::Data<Mutex<APIData>>) -> impl Responder {
+    let db = &mut data.lock().unwrap().database;
     db.get_path()
 }
 
 #[put("/world/stats")]
-async fn stats(data: web::Data<APIData>, info: web::Json<Info>) -> impl Responder {
-    let _db = data.database.lock().unwrap();
+async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>) -> impl Responder {
+    let unlocked_data = &mut data.lock().unwrap();
+    let db = &mut unlocked_data.database;
 
-    if !info.auth.eq(&data.auth) {
+    if !info.auth.eq(&unlocked_data.auth) {
         return HttpResponse::Forbidden()
     }
 
@@ -83,8 +86,8 @@ async fn stats(data: web::Data<APIData>, info: web::Json<Info>) -> impl Responde
 }
 
 #[put("/world")]
-async fn switch_world(data: web::Data<APIData>, switch_info: web::Json<SwitchInfo>) -> impl Responder {
-    let mut db = data.database.lock().unwrap();
+async fn switch_world(data: web::Data<Mutex<APIData>>, switch_info: web::Json<SwitchInfo>) -> impl Responder {
+    let db = &mut data.lock().unwrap().database;
 
     return match db.switch_world(switch_info.world) {
         Ok(()) => {
@@ -98,8 +101,8 @@ async fn switch_world(data: web::Data<APIData>, switch_info: web::Json<SwitchInf
 }
 
 #[put("/world/create")]
-async fn create_world(data: web::Data<APIData>) -> impl Responder {
-    let mut db = data.database.lock().unwrap();
+async fn create_world(data: web::Data<Mutex<APIData>>) -> impl Responder {
+    let db = &mut data.lock().unwrap().database;
 
     return match db.create_world() {
         Ok(()) => {
@@ -112,10 +115,16 @@ async fn create_world(data: web::Data<APIData>) -> impl Responder {
     }
 }
 
+#[get("/sleep")]
+async fn sleep() -> impl Responder {
+    std::thread::sleep(time::Duration::from_secs(5));
+    HttpResponse::Ok()
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let path = std::env::current_dir().unwrap().join("db");
-    let mut db = match path.exists() {
+    let db = match path.exists() {
         true => {
             println!("Retrieving existing database");
             Database::from(path).expect("Something went wrong getting the existing database")
@@ -126,6 +135,11 @@ async fn main() -> std::io::Result<()> {
         },
     };
 
+    let api_data = web::Data::new(Mutex::new(APIData {
+        database: db,
+        auth: fs::read_to_string("auth.txt").expect("Auth setup failed")
+    }));
+
     // HttpServer server spawns "workers" equal to the number
     // of phyiscal cpu's / cores available in the system
     //
@@ -134,17 +148,14 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
 
         App::new()
-        .app_data(web::Data::new(APIData {
-            // database: Mutex::new(db.clone()),
-            database: Mutex::new(&mut db),
-            auth: fs::read_to_string("auth.txt").expect("Auth setup failed")
-        }))
+            .app_data(web::Data::clone(&api_data))
             .service(hello)
             .service(stats)
             .service(get_current_world)
             .service(get_db_path)
             .service(create_world)
             .service(switch_world)
+            .service(sleep)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
