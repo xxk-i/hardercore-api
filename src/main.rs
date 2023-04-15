@@ -144,9 +144,8 @@ async fn main() -> std::io::Result<()> {
     // of phyiscal cpu's / cores available in the system
     //
     // the db is created outside of HttpServer::new so it is only created once,
-    // we have to clone the db into each HttpServer
+    // we have to clone a reference to the data wrapper to each app instance
     HttpServer::new(move || {
-
         App::new()
             .app_data(web::Data::clone(&api_data))
             .service(hello)
