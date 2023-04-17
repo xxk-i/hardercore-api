@@ -1,14 +1,15 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, put};
-use serde::{Deserialize, de::Expected};
+use serde::{Deserialize};
 use core::time;
 use std::{sync::Mutex, fs};
 
 mod db;
+
 use db::Database;
 
 pub struct APIData {
     pub database: Database,
-    auth: String,
+    auth: String
 }
 
 #[derive(Deserialize)]
@@ -37,8 +38,6 @@ async fn hello() -> impl Responder {
 
 #[get("/world/current")]
 pub async fn get_current_world(data: web::Data<Mutex<APIData>>) -> impl Responder {
-    // HTTPRequest::app_data().database.get_current_world()
-    println!("{:?} is getting current world", std::thread::current().id());
     let db = &mut data.lock().unwrap().database;
     db.get_current_world()
 }
@@ -121,6 +120,13 @@ async fn sleep() -> impl Responder {
     HttpResponse::Ok()
 }
 
+#[put("/world/stats/")]
+async fn update_time_in_water(data: web::Data<Mutex<APIData>>, info: web::Json<Info>) -> impl Responder {
+    data.lock().unwrap().database.update_time_in_water(info.UUID.clone(), 1).await.expect("fuck");
+
+    HttpResponse::Ok()
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let path = std::env::current_dir().unwrap().join("db");
@@ -149,7 +155,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::clone(&api_data))
             .service(hello)
-            .service(stats)
+            // .service(stats)
+            .service(update_time_in_water)
             .service(get_current_world)
             .service(get_db_path)
             .service(create_world)

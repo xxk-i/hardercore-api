@@ -1,16 +1,29 @@
 use std::{path::{PathBuf}, fs};
-
 use actix_web::{Responder, HttpResponse};
 
-use self::errors::*;
-
 mod errors;
+use errors::*;
 
-#[derive(Clone)]
+mod mojang;
+mod cache;
+mod world;
+use world::*;
+
+pub struct PlayerStats {
+    pub uuid: String,
+    pub time_in_water: u64,
+    pub damage_taken: u64,
+    pub mobs_killed: u64,
+    pub food_eaten: u64,
+    pub experience_gained: u64
+}
+
 pub struct Database {
     pub path: PathBuf,
+    world: World,
+    cache: cache::ProfileCache,
     world_count: u64,
-    current_world: u64,
+    current_world: u64
 }
 
 impl Database {
@@ -19,7 +32,13 @@ impl Database {
             fs::create_dir(&path)?;
         }
 
-        let mut db = Database { path: path, world_count: 0, current_world: 0 };
+        let mut db = Database {
+            path: path,
+            world: World::new(),
+            cache: cache::ProfileCache::new(),
+            world_count: 0,
+            current_world: 0
+        };
 
         db.initalize_db_directory()?;
 
@@ -27,7 +46,13 @@ impl Database {
     }
 
     pub fn from(path: PathBuf) -> Result<Self, DatabaseError> {
-        let mut db = Database { path: path, world_count: 0, current_world: 0 };
+        let mut db = Database {
+            world: World::new(),
+            path: path,
+            cache: cache::ProfileCache::new(),
+            world_count: 0,
+            current_world: 0
+        };
 
         db.world_count = db.find_latest_world()?;
         db.switch_world(db.world_count);
@@ -66,14 +91,18 @@ impl Database {
             }
         }
 
-        // self.world_count = highest;
-        // self.switch_world(highest).expect("Failed to switch to latest found world");
-
         Ok(highest)
     }
 
-    pub fn update_time_in_water(&mut self, uuid: String, time: u64) {
-        unimplemented!()
+    fn update_stat(&mut self) {
+        
+    }
+
+    pub async fn update_time_in_water(&mut self, uuid: String, time: u64) -> Result<(), Box<dyn std::error::Error>> {
+        let profile = self.cache.get(uuid).await;
+        println!("{:#?}", profile);
+
+        Ok(())
     }
 
     pub fn world_death_event(&mut self) {
@@ -111,5 +140,4 @@ impl Database {
         self.current_world = world;
         Ok(())
     }
-
 }
