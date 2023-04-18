@@ -1,4 +1,4 @@
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, put};
+use actix_web::{get, web::{self}, App, HttpResponse, HttpServer, Responder, put};
 use serde::{Deserialize};
 use core::time;
 use std::{sync::Mutex, fs};
@@ -13,22 +13,26 @@ pub struct APIData {
 }
 
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
 struct SwitchInfo {
     world: u64
 }
 
 #[derive(Deserialize)]
-#[allow(non_snake_case)] // we use json naming convention here
+#[serde(rename_all = "camelCase")] // json naming convention
 struct Info {
     auth: String,
-    UUID: String,
-    timeInWater: Option<u64>,
-    damageTaken: Option<u64>,
-    hasDied: Option<bool>,
-    mobsKilled: Option<u64>,
-    foodEaten: Option<u64>,
-    experienceGained: Option<u64>
+    uuid: String,
+    time_in_water: Option<u64>,
+    damage_taken: Option<u64>,
+    has_died: Option<bool>,
+    mobs_killed: Option<u64>,
+    food_eaten: Option<u64>,
+    experience_gained: Option<u64>
+}
+
+#[derive(Deserialize)]
+struct GetPlayerInfo {
+    uuid: String
 }
 
 #[get("/")]
@@ -51,34 +55,43 @@ pub async fn get_db_path(data: web::Data<Mutex<APIData>>) -> impl Responder {
 #[put("/world/stats")]
 async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>) -> impl Responder {
     let unlocked_data = &mut data.lock().unwrap();
-    let db = &mut unlocked_data.database;
 
     if !info.auth.eq(&unlocked_data.auth) {
         return HttpResponse::Forbidden()
     }
 
-    if let Some(time) = &info.timeInWater {
-        println!("{}'s time spent in water: {}", info.UUID, time);
+    let db = &mut unlocked_data.database;
+
+    if let Some(time) = &info.time_in_water {
+        db.update_time_in_water(&info.uuid, *time).await.unwrap();
+
+        if cfg!(debug_assertions) {
+            println!("{}'s time spent in water: {}", info.uuid, time);
+        }
     }
 
-    if let Some(damage_taken)  = &info.damageTaken {
-        println!("{}'s damage taken: {}", info.UUID, damage_taken);
+    if let Some(damage_taken)  = &info.damage_taken {
+        db.update_damage_taken(&info.uuid, *damage_taken).await.unwrap();
+        println!("{}'s damage taken: {}", info.uuid, damage_taken);
     }
 
-    if let Some(has_died)  = &info.hasDied {
-        println!("{} has died: {}", info.UUID, has_died);
+    if let Some(has_died)  = &info.has_died {
+        println!("{} has died: {}", info.uuid, has_died);
     }
 
-    if let Some(mobs_killed) = &info.mobsKilled {
-        println!("{} has killed: {}", info.UUID, mobs_killed);
+    if let Some(mobs_killed) = &info.mobs_killed {
+        db.update_mobs_killed(&info.uuid, *mobs_killed).await.unwrap();
+        println!("{} has killed: {}", info.uuid, mobs_killed);
     }
 
-    if let Some(food_eaten) = &info.foodEaten {
-        println!("{} has eaten: {} food.", info.UUID, food_eaten);
+    if let Some(food_eaten) = &info.food_eaten {
+        db.update_food_eaten(&info.uuid, *food_eaten).await.unwrap();
+        println!("{} has eaten: {} food.", info.uuid, food_eaten);
     }
 
-    if let Some(experienced_gained) = &info.experienceGained {
-        println!("{} has gained: {} experience", info.UUID, experienced_gained);
+    if let Some(experienced_gained) = &info.experience_gained {
+        db.update_experience_gained(&info.uuid, *experienced_gained).await.unwrap();
+        println!("{} has gained: {} experience", info.uuid, experienced_gained);
     }
 
     HttpResponse::Ok()
@@ -120,15 +133,23 @@ async fn sleep() -> impl Responder {
     HttpResponse::Ok()
 }
 
-#[put("/world/stats/")]
-async fn update_time_in_water(data: web::Data<Mutex<APIData>>, info: web::Json<Info>) -> impl Responder {
-    data.lock().unwrap().database.update_time_in_water(info.UUID.clone(), 1).await.expect("fuck");
+#[get("/world/stats/{uuid}")]
+async fn get_stats(data: web::Data<Mutex<APIData>>, path: web::Path<(String,)>) -> impl Responder {
+    match data.lock().unwrap().database.get_player_stats(&path.into_inner().0) {
+        Err(e) => {
+            HttpResponse::BadRequest().body(e.to_string())
+        },
 
-    HttpResponse::Ok()
+        Ok(player_stats) => {
+            HttpResponse::Ok().body(serde_json::to_string(player_stats).unwrap())
+        },
+
+    }
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    color_eyre::install().unwrap();
     let path = std::env::current_dir().unwrap().join("db");
     let db = match path.exists() {
         true => {
@@ -146,17 +167,32 @@ async fn main() -> std::io::Result<()> {
         auth: fs::read_to_string("auth.txt").expect("Auth setup failed")
     }));
 
+    // syntax bullshit nightmare because async closures are unstable
+    // so we make a normal closure that creates an environment with
+    // a reference to api_data, then move that environment into our async block
+    // allowing our loop to call the database to save every 2 minutes
+    actix_rt::spawn((|api_data: web::Data<Mutex<APIData>>| {
+        async move {
+            let mut interval = actix_rt::time::interval(std::time::Duration::from_secs(120));
+            loop {
+                interval.tick().await;
+                let unlocked = api_data.lock().unwrap();
+                unlocked.database.save().expect("Database failed to save");
+            }
+        }
+    })(api_data.clone()));
+
     // HttpServer server spawns "workers" equal to the number
     // of phyiscal cpu's / cores available in the system
     //
     // the db is created outside of HttpServer::new so it is only created once,
-    // we have to clone a reference to the data wrapper to each app instance
+    // we clone this Data<T> wrapper to every app_data instance
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::clone(&api_data))
+            .app_data(api_data.clone())
             .service(hello)
-            // .service(stats)
-            .service(update_time_in_water)
+            .service(stats)
+            .service(get_stats)
             .service(get_current_world)
             .service(get_db_path)
             .service(create_world)
@@ -166,4 +202,5 @@ async fn main() -> std::io::Result<()> {
     .bind(("127.0.0.1", 8080))?
     .run()
     .await
+
 }

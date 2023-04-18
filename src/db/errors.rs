@@ -1,24 +1,24 @@
 use actix_web::{error};
-use derive_more::{Display, Error};
+use thiserror::Error;
+use std::{io, path::PathBuf};
 
-// Generic error for if shit goes real bad
-#[derive(Debug, Clone, Display, Error)]
-#[display(fmt = "Database error")]
-pub struct DatabaseError;
+// Set of different databaseerrors with thiserror
+#[derive(Debug, Error)]
+pub enum DatabaseError {
+    #[error("newly created database folder is not empty")]
+    DatabaseNotEmpty,
+
+    #[error("IO error")]
+    IOError(#[from] io::Error),
+
+    #[error("\"worlds\" folder not found at path {0}")]
+    WorldsFolderNotFound(PathBuf),
+
+    #[error("player not found")]
+    PlayerNotFound,
+
+    #[error("serde serialization error")]
+    SerializationFailed(#[from] serde_json::Error)
+}
 
 impl error::ResponseError for DatabaseError {}
-
-impl From<std::io::Error> for DatabaseError {
-    fn from(_value: std::io::Error) -> Self {
-        DatabaseError{}
-    }
-}
-
-// Error when attempting to switch to a world that doesn't/hasn't existed 
-#[derive(Debug, Clone, Display, Error)]
-#[display(fmt = "WorldNotFoundError: world {world_number} does not exist")]
-pub struct WorldNotFoundError {
-    pub world_number: u64
-}
-
-impl error::ResponseError for WorldNotFoundError {}

@@ -3,3 +3,4 @@
 /db
 auth.txt
 /.DS_Store
+Cargo.lock
