@@ -115,19 +115,21 @@ impl Database {
     }
 
     pub fn save(&self) -> Result<(), DatabaseError> {
+        println!("Saving database...");
         for entry in &self.world.player_stats {
             let mut file = File::create(self.path.join(format!("worlds/world{}/{}.json", self.current_world, entry.0)))?;
-            if serde_json::to_string(entry.1)?.as_bytes().is_empty() {
-                println!("shits empty");
-            }
-            file.write_all(serde_json::to_string(entry.1)?.as_bytes())?;
+
+            // catch me never not pretty printing
+            let pretty_string = serde_json::to_string_pretty(entry.1)?;
+
+            file.write_all(pretty_string.as_bytes())?;
         }
 
         Ok(())
     }
 
     pub async fn update_time_in_water(&mut self, uuid: &String, time: u64) -> Result<(), Box<dyn std::error::Error>> {
-        self.world.try_add_new_player(uuid.clone(), self.cache.get(uuid).await.name.clone());
+        self.world.try_add_new_player(uuid, self.cache.get(uuid).await);
 
         self.world.player_stats.get_mut(uuid).unwrap().time_in_water += time;
 
@@ -135,28 +137,28 @@ impl Database {
     }
 
     pub async fn update_damage_taken(&mut self, uuid: &String, damage: u64) -> Result<(), Box<dyn std::error::Error>> {
-        self.world.try_add_new_player(uuid.clone(), self.cache.get(uuid).await.name.clone());
+        self.world.try_add_new_player(uuid, self.cache.get(uuid).await);
         self.world.player_stats.get_mut(uuid).unwrap().damage_taken += damage;
 
         Ok(())
     }
 
     pub async fn update_mobs_killed(&mut self, uuid: &String, count: u64) -> Result<(), Box<dyn std::error::Error>> {
-        self.world.try_add_new_player(uuid.clone(), self.cache.get(uuid).await.name.clone());
+        self.world.try_add_new_player(uuid, self.cache.get(uuid).await);
         self.world.player_stats.get_mut(uuid).unwrap().mobs_killed += count;
 
         Ok(())
     }
 
     pub async fn update_food_eaten(&mut self, uuid: &String, count: u64) -> Result<(), Box<dyn std::error::Error>> {
-        self.world.try_add_new_player(uuid.clone(), self.cache.get(uuid).await.name.clone());
+        self.world.try_add_new_player(uuid, self.cache.get(uuid).await);
         self.world.player_stats.get_mut(uuid).unwrap().food_eaten += count;
 
         Ok(())
     }
 
     pub async fn update_experience_gained(&mut self, uuid: &String, amount: u64) -> Result<(), Box<dyn std::error::Error>> {
-        self.world.try_add_new_player(uuid.clone(), self.cache.get(uuid).await.name.clone());
+        self.world.try_add_new_player(uuid, self.cache.get(uuid).await);
         self.world.player_stats.get_mut(uuid).unwrap().experience_gained += amount;
 
         Ok(())
@@ -200,5 +202,11 @@ impl Database {
             None => Err(DatabaseError::PlayerNotFound),
             Some(stats) => Ok(stats)
         }
+    }
+
+    pub fn get_all_stats(&self) -> Result<String, DatabaseError> {
+        let stats: Vec<&PlayerStats> = self.world.player_stats.iter().map(|entry| entry.1).collect();
+
+        Ok(serde_json::to_string_pretty(&stats)?)
     }
 }

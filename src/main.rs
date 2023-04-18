@@ -18,6 +18,19 @@ struct SwitchInfo {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KillInfo {
+    // UUID of player who died (killed the world)
+    killer: String,
+
+    // name of damage source that killed the player
+    source_name: String,
+
+    // name of damage source type applied that killed the player
+    source_type: String
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")] // json naming convention
 struct Info {
     auth: String,
@@ -97,6 +110,11 @@ async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>) -> impl R
     HttpResponse::Ok()
 }
 
+#[put("/world/kill")]
+async fn kill_world(data: web::Data<Mutex<APIData>>, ) -> impl Responder {
+    HttpResponse::Ok()
+}
+
 #[put("/world")]
 async fn switch_world(data: web::Data<Mutex<APIData>>, switch_info: web::Json<SwitchInfo>) -> impl Responder {
     let db = &mut data.lock().unwrap().database;
@@ -147,6 +165,13 @@ async fn get_stats(data: web::Data<Mutex<APIData>>, path: web::Path<(String,)>) 
     }
 }
 
+#[get("world/stats")]
+async fn get_all_stats(data: web::Data<Mutex<APIData>>) -> impl Responder {
+    let db = &data.lock().unwrap().database;
+
+    HttpResponse::Ok().body(db.get_all_stats().expect("Saved player stats JSON is probably malformed!"))
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     color_eyre::install().unwrap();
@@ -173,7 +198,7 @@ async fn main() -> std::io::Result<()> {
     // allowing our loop to call the database to save every 2 minutes
     actix_rt::spawn((|api_data: web::Data<Mutex<APIData>>| {
         async move {
-            let mut interval = actix_rt::time::interval(std::time::Duration::from_secs(120));
+            let mut interval = actix_rt::time::interval(std::time::Duration::from_secs(10));
             loop {
                 interval.tick().await;
                 let unlocked = api_data.lock().unwrap();
@@ -190,14 +215,16 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(api_data.clone())
-            .service(hello)
+            // .service(hello)
             .service(stats)
+            .service(get_all_stats)
             .service(get_stats)
             .service(get_current_world)
             .service(get_db_path)
             .service(create_world)
             .service(switch_world)
-            .service(sleep)
+            .service(kill_world)
+            // .service(sleep)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

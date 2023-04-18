@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use actix_web::error;
 
+use super::mojang;
+
 // Error when attempting to switch to a world that doesn't/hasn't existed 
 #[derive(Debug, Error)]
 pub enum WorldError {
@@ -25,6 +27,7 @@ impl error::ResponseError for WorldError {}
 #[serde(rename_all = "camelCase", default)]
 pub struct PlayerStats {
     pub display_name: String,
+    pub skin_url: String,
     pub time_in_water: u64,
     pub damage_taken: u64,
     pub mobs_killed: u64,
@@ -67,14 +70,16 @@ impl World {
         Ok(world)
     }
 
-    pub fn try_add_new_player(&mut self, uuid: String, display_name: String) {
-        if !self.player_stats.contains_key(&uuid) {
+    // adds a new PlayerStats to the world if it doesn't already exist
+    pub fn try_add_new_player(&mut self, uuid: &String, profile: &mojang::Profile) {
+        if !self.player_stats.contains_key(uuid) {
             let stats = PlayerStats {
-                display_name,
+                display_name: profile.name.clone(),
+                skin_url: profile.get_skin_url(),
                 ..Default::default()
             };
 
-            self.player_stats.insert(uuid, stats);
+            self.player_stats.insert(uuid.clone(), stats);
         }
     }
 }
