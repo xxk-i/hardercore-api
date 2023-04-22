@@ -9,6 +9,8 @@ mod cache;
 mod world;
 use world::*;
 
+use super::util::KillInfo;
+
 #[derive(Debug)]
 pub struct Database {
     pub path: PathBuf,
@@ -105,7 +107,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn world_death_event(&mut self, kill_info: &super::KillInfo) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn world_death_event(&mut self, kill_info: &KillInfo) -> Result<(), Box<dyn std::error::Error>> {
         println!("{} has killed the world", kill_info.killer);
 
         let mut file = File::create(self.path.join(format!("worlds/world{}/killed.json", self.current_world)))?;

@@ -7,9 +7,7 @@ use thiserror::Error;
 use actix_web::error;
 
 use super::mojang;
-
-use macros::Stats;
-use macros::stat;
+use crate::util::Info;
 
 // Error when attempting to switch to a world that doesn't/hasn't existed 
 #[derive(Debug, Error)]
@@ -29,7 +27,7 @@ pub enum WorldError {
 
 impl error::ResponseError for WorldError {}
 
-#[derive(Deserialize, Debug, Default, Serialize, Clone, Stats)]
+#[derive(Deserialize, Debug, Default, Serialize, Clone)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PlayerStats {
     pub display_name: String,
@@ -89,7 +87,7 @@ impl World {
         }
     }
 
-    pub fn merge_stats(&mut self, uuid: String, info: crate::Info) -> Result<(), super::DatabaseError> {
+    pub fn merge_stats(&mut self, uuid: String, info: Info) -> Result<(), super::DatabaseError> {
         let stats = match self.player_stats.get_mut(&uuid) {
             Some(stats) => stats,
             None => return Err(super::DatabaseError::PlayerNotFound)
