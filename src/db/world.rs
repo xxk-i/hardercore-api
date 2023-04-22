@@ -8,6 +8,9 @@ use actix_web::error;
 
 use super::mojang;
 
+use macros::Stats;
+use macros::stat;
+
 // Error when attempting to switch to a world that doesn't/hasn't existed 
 #[derive(Debug, Error)]
 pub enum WorldError {
@@ -18,12 +21,15 @@ pub enum WorldError {
     PlayerStatsJSONError(#[from] serde_json::Error),
 
     #[error("World IO Error")]
-    IOError(#[from] std::io::Error)
+    IOError(#[from] std::io::Error),
+
+    #[error("Player not found")]
+    PlayerNotFound
 }
 
 impl error::ResponseError for WorldError {}
 
-#[derive(Deserialize, Debug, Default, Serialize, Clone)]
+#[derive(Deserialize, Debug, Default, Serialize, Clone, Stats)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PlayerStats {
     pub display_name: String,
@@ -65,8 +71,8 @@ impl World {
                     world.player_stats.insert(uuid.clone(), stats);
                 }
             }
-        }
 
+        }
         Ok(world)
     }
 
@@ -81,5 +87,34 @@ impl World {
 
             self.player_stats.insert(uuid.clone(), stats);
         }
+    }
+
+    pub fn merge_stats(&mut self, uuid: String, info: crate::Info) -> Result<(), super::DatabaseError> {
+        let stats = match self.player_stats.get_mut(&uuid) {
+            Some(stats) => stats,
+            None => return Err(super::DatabaseError::PlayerNotFound)
+        };
+
+        if let Some(time) = &info.time_in_water {
+            stats.time_in_water += time;
+        }
+
+        if let Some(damage_taken)  = &info.damage_taken {
+            stats.damage_taken += damage_taken;
+        }
+
+        if let Some(mobs_killed) = &info.mobs_killed {
+            stats.mobs_killed += mobs_killed;
+        }
+
+        if let Some(food_eaten) = &info.food_eaten {
+            stats.food_eaten += food_eaten;
+        }
+
+        if let Some(experienced_gained) = &info.experience_gained {
+            stats.experience_gained += experienced_gained;
+        }
+
+        Ok(())
     }
 }

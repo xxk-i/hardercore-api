@@ -1,6 +1,6 @@
 use serde::{Deserialize};
 use reqwest;
-use base64::{Engine as _, engine::{self, general_purpose}};
+use base64::{Engine as _, engine::{general_purpose}};
 
 
 #[derive(Deserialize, Debug)]
@@ -16,7 +16,7 @@ pub struct Textures {
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 pub struct DecodedValue {
    timestamp: u64, 
    profileId: String,

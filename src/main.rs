@@ -1,5 +1,5 @@
 use actix_web::{get, web::{self}, App, HttpResponse, HttpServer, Responder, put};
-use serde::{Deserialize};
+use serde::{Deserialize, Serialize};
 use core::time;
 use std::{sync::Mutex, fs};
 
@@ -17,35 +17,30 @@ struct SwitchInfo {
     world: u64
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct KillInfo {
+pub struct KillInfo {
     // UUID of player who died (killed the world)
-    killer: String,
+    pub killer: String,
 
     // name of damage source that killed the player
-    source_name: String,
+    pub source_name: String,
 
     // name of damage source type applied that killed the player
-    source_type: String
+    pub source_type: String
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")] // json naming convention
-struct Info {
+pub struct Info {
     auth: String,
-    uuid: String,
-    time_in_water: Option<u64>,
-    damage_taken: Option<u64>,
-    has_died: Option<bool>,
-    mobs_killed: Option<u64>,
-    food_eaten: Option<u64>,
-    experience_gained: Option<u64>
-}
-
-#[derive(Deserialize)]
-struct GetPlayerInfo {
-    uuid: String
+    pub time_in_water: Option<u64>,
+    pub damage_taken: Option<u64>,
+    pub has_died: Option<bool>,
+    pub mobs_killed: Option<u64>,
+    pub food_eaten: Option<u64>,
+    pub experience_gained: Option<u64>,
+    pub kill_info: Option<KillInfo>
 }
 
 #[get("/")]
@@ -65,54 +60,21 @@ pub async fn get_db_path(data: web::Data<Mutex<APIData>>) -> impl Responder {
     db.get_path()
 }
 
-#[put("/world/stats")]
-async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>) -> impl Responder {
-    let unlocked_data = &mut data.lock().unwrap();
+#[put("/world/stats/{uuid}")]
+async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>, path: web::Path<(String,)>) -> impl Responder {
+    let db = &mut data.lock().unwrap().database;
 
-    if !info.auth.eq(&unlocked_data.auth) {
-        return HttpResponse::Forbidden()
-    }
+    let uuid = path.into_inner().0;
 
-    let db = &mut unlocked_data.database;
+    match db.world.merge_stats(uuid, info.into_inner()) {
+        Ok(_) => {},
 
-    if let Some(time) = &info.time_in_water {
-        db.update_time_in_water(&info.uuid, *time).await.unwrap();
-
-        if cfg!(debug_assertions) {
-            println!("{}'s time spent in water: {}", info.uuid, time);
+        Err(e) => {
+            return HttpResponse::BadRequest().body(e.to_string());
         }
-    }
+    };
 
-    if let Some(damage_taken)  = &info.damage_taken {
-        db.update_damage_taken(&info.uuid, *damage_taken).await.unwrap();
-        println!("{}'s damage taken: {}", info.uuid, damage_taken);
-    }
-
-    if let Some(has_died)  = &info.has_died {
-        println!("{} has died: {}", info.uuid, has_died);
-    }
-
-    if let Some(mobs_killed) = &info.mobs_killed {
-        db.update_mobs_killed(&info.uuid, *mobs_killed).await.unwrap();
-        println!("{} has killed: {}", info.uuid, mobs_killed);
-    }
-
-    if let Some(food_eaten) = &info.food_eaten {
-        db.update_food_eaten(&info.uuid, *food_eaten).await.unwrap();
-        println!("{} has eaten: {} food.", info.uuid, food_eaten);
-    }
-
-    if let Some(experienced_gained) = &info.experience_gained {
-        db.update_experience_gained(&info.uuid, *experienced_gained).await.unwrap();
-        println!("{} has gained: {} experience", info.uuid, experienced_gained);
-    }
-
-    HttpResponse::Ok()
-}
-
-#[put("/world/kill")]
-async fn kill_world(data: web::Data<Mutex<APIData>>, ) -> impl Responder {
-    HttpResponse::Ok()
+    HttpResponse::Ok().body("OK")
 }
 
 #[put("/world")]
@@ -215,7 +177,6 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(api_data.clone())
-            // .service(hello)
             .service(stats)
             .service(get_all_stats)
             .service(get_stats)
@@ -223,10 +184,9 @@ async fn main() -> std::io::Result<()> {
             .service(get_db_path)
             .service(create_world)
             .service(switch_world)
-            .service(kill_world)
-            // .service(sleep)
     })
     .bind(("127.0.0.1", 8080))?
+    .bind(("172.25.254.1", 8080))?
     .run()
     .await
 
