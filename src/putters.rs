@@ -1,6 +1,8 @@
 use actix_web::{web, put, Responder, HttpResponse};
 use std::{sync::Mutex};
 
+use crate::util::KillInfo;
+
 use super::util::APIData;
 use super::util::SwitchInfo;
 use super::util::Info;
@@ -47,13 +49,24 @@ pub async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>, path:
 
     let uuid = path.into_inner().0;
 
-    match db.world.merge_stats(uuid, info.into_inner()) {
-        Ok(_) => {},
+    println!("Putting stats for: {}", uuid);
 
-        Err(e) => {
-            return HttpResponse::BadRequest().body(e.to_string());
-        }
-    };
+    db.world.merge_stats(uuid, info.into_inner()).await;
 
     HttpResponse::Ok().body("OK")
+}
+
+#[put("/world/kill")]
+pub async fn kill_world(data: web::Data<Mutex<APIData>>, kill_info: web::Json<KillInfo>) -> impl Responder {
+    let mut apidata = data.lock().unwrap();
+
+    if !kill_info.auth.eq(&apidata.auth) {
+        return HttpResponse::Forbidden().body("Auth failed")
+    }
+
+    let db = &mut apidata.database;
+    match db.world_death_event(&kill_info) {
+        Ok(()) => HttpResponse::Ok().body("OK"),
+        Err(e) => HttpResponse::BadRequest().body(e.to_string())
+    }
 }

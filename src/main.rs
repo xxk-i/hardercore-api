@@ -53,13 +53,18 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(api_data.clone())
-            .service(putters::stats)
-            .service(putters::create_world)
-            .service(putters::switch_world)
+
+            // getters 
             .service(getters::get_all_stats)
             .service(getters::get_stats)
             .service(getters::get_current_world)
             .service(getters::get_db_path)
+
+            // putters
+            .service(putters::stats)
+            .service(putters::create_world)
+            .service(putters::switch_world)
+            .service(putters::kill_world)
     })
     .bind(("127.0.0.1", 8080))?
     .bind(("172.25.254.1", 8080))?

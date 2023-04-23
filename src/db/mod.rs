@@ -15,7 +15,6 @@ use super::util::KillInfo;
 pub struct Database {
     pub path: PathBuf,
     pub world: World,
-    cache: cache::ProfileCache,
     world_count: u64,
     current_world: u64
 }
@@ -29,7 +28,6 @@ impl Database {
         let mut db = Database {
             path: path,
             world: World::new(),
-            cache: cache::ProfileCache::new(),
             world_count: 0,
             current_world: 0
         };
@@ -45,7 +43,6 @@ impl Database {
         let mut db = Database {
             world: World::new(),
             path: path.clone(),
-            cache: cache::ProfileCache::new(),
             world_count: world_count,
             current_world: 0
         };

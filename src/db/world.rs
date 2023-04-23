@@ -8,6 +8,7 @@ use actix_web::error;
 
 use super::mojang;
 use crate::util::Info;
+use super::cache::ProfileCache;
 
 // Error when attempting to switch to a world that doesn't/hasn't existed 
 #[derive(Debug, Error)]
@@ -43,7 +44,8 @@ pub struct PlayerStats {
 pub struct World {
     pub player_stats: HashMap<String, PlayerStats>,
     pub uptime: u64,
-    pub killer: Option<super::PlayerStats>
+    pub killer: Option<super::PlayerStats>,
+    cache: ProfileCache,
 }
 
 impl World {
@@ -51,7 +53,8 @@ impl World {
         World {
             player_stats: HashMap::new(),
             uptime: 0,
-            killer: None
+            killer: None,
+            cache: ProfileCache::new()
         }
     }
 
@@ -75,7 +78,9 @@ impl World {
     }
 
     // adds a new PlayerStats to the world if it doesn't already exist
-    pub fn try_add_new_player(&mut self, uuid: &String, profile: &mojang::Profile) {
+    pub async fn get_player_stats(&mut self, uuid: &String) -> &mut PlayerStats {
+        let profile = self.cache.get(uuid).await;
+
         if !self.player_stats.contains_key(uuid) {
             let stats = PlayerStats {
                 display_name: profile.name.clone(),
@@ -85,13 +90,12 @@ impl World {
 
             self.player_stats.insert(uuid.clone(), stats);
         }
+
+        self.player_stats.get_mut(uuid).unwrap()
     }
 
-    pub fn merge_stats(&mut self, uuid: String, info: Info) -> Result<(), super::DatabaseError> {
-        let stats = match self.player_stats.get_mut(&uuid) {
-            Some(stats) => stats,
-            None => return Err(super::DatabaseError::PlayerNotFound)
-        };
+    pub async fn merge_stats(&mut self, uuid: String, info: Info) {
+        let stats = self.get_player_stats(&uuid).await;
 
         if let Some(time) = &info.time_in_water {
             stats.time_in_water += time;
@@ -112,7 +116,5 @@ impl World {
         if let Some(experienced_gained) = &info.experience_gained {
             stats.experience_gained += experienced_gained;
         }
-
-        Ok(())
     }
 }

@@ -14,6 +14,10 @@ pub struct SwitchInfo {
 #[derive(Deserialize, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KillInfo {
+    #[serde(skip_serializing)]
+    // same auth as Info
+    pub auth: String,
+
     // UUID of player who died (killed the world)
     pub killer: String,
 
