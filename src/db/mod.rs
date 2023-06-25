@@ -7,9 +7,17 @@ use errors::*;
 mod mojang;
 mod cache;
 mod world;
+
+use serde::Deserialize;
+use serde::Serialize;
 use world::*;
 
 use super::util::KillInfo;
+
+#[derive(Serialize, Deserialize)]
+pub struct Global {
+    pub uptime: u64
+}
 
 #[derive(Debug)]
 pub struct Database {
@@ -92,6 +100,8 @@ impl Database {
 
     pub fn save(&self) -> Result<(), DatabaseError> {
         println!("Saving database...");
+
+        // save all player stats to files labeled by uuid
         for entry in &self.world.player_stats {
             let mut file = File::create(self.path.join(format!("worlds/world{}/{}.json", self.current_world, entry.0)))?;
 
@@ -100,6 +110,15 @@ impl Database {
 
             file.write_all(pretty_string.as_bytes())?;
         }
+        
+        // save world uptime in global.json
+        let mut file = File::create(self.path.join("global.json"));
+
+        let mut global_data = Global {
+            uptime: self.world.uptime
+        };
+
+        file.write_all(serde_json::to_string_pretty(&global_data)?.as_bytes()?)?;
 
         Ok(())
     }

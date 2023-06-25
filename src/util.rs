@@ -40,3 +40,10 @@ pub struct Info {
     pub experience_gained: Option<u64>,
     pub kill_info: Option<KillInfo>
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UptimeInfo {
+    pub auth: String,
+    pub uptime: u64
+}

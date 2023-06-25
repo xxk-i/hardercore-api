@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use actix_web::error;
 
-use super::mojang;
 use crate::util::Info;
 use super::cache::ProfileCache;
 
@@ -22,8 +21,8 @@ pub enum WorldError {
     #[error("World IO Error")]
     IOError(#[from] std::io::Error),
 
-    #[error("Player not found")]
-    PlayerNotFound
+    // #[error("Player not found")]
+    // PlayerNotFound
 }
 
 impl error::ResponseError for WorldError {}
@@ -65,15 +64,22 @@ impl World {
             let file = file?;
             if file.file_type().unwrap().is_file() {
                 if file.path().extension().unwrap().eq("json") {
-                    let data = fs::read_to_string(file.path())?;
-                    let uuid = file.path().file_stem().unwrap().to_str().unwrap().to_owned();
-                    let stats: super::PlayerStats = serde_json::from_str(&data)?;
+                    if file.file_name().eq("global.json") {
+                        let global_data: super::Global = serde_json::from_str(&fs::read_to_string(file.path())?);
+                        world.uptime = global_data.uptime;
+                    } else {
+                        let data = fs::read_to_string(file.path())?;
+                        let uuid = file.path().file_stem().unwrap().to_str().unwrap().to_owned();
+                        let stats: super::PlayerStats = serde_json::from_str(&data)?;
 
-                    world.player_stats.insert(uuid.clone(), stats);
+                        world.player_stats.insert(uuid.clone(), stats);
+
+                    }
                 }
             }
 
         }
+
         Ok(world)
     }
 
