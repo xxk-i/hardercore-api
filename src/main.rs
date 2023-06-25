@@ -59,12 +59,14 @@ async fn main() -> std::io::Result<()> {
             .service(getters::get_stats)
             .service(getters::get_current_world)
             .service(getters::get_db_path)
+            .service(getters::get_uptime)
 
             // putters
             .service(putters::stats)
             .service(putters::create_world)
             .service(putters::switch_world)
             .service(putters::kill_world)
+            .service(putters::set_uptime)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

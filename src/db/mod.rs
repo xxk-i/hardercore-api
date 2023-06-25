@@ -112,13 +112,13 @@ impl Database {
         }
         
         // save world uptime in global.json
-        let mut file = File::create(self.path.join("global.json"));
+        let mut file = File::create(self.path.join(format!("worlds/world{}/global.json", self.current_world)))?;
 
-        let mut global_data = Global {
+        let global_data = Global {
             uptime: self.world.uptime
         };
 
-        file.write_all(serde_json::to_string_pretty(&global_data)?.as_bytes()?)?;
+        file.write_all(serde_json::to_string_pretty(&global_data)?.as_bytes())?;
 
         Ok(())
     }

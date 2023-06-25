@@ -57,8 +57,8 @@ pub async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>, path:
     HttpResponse::Ok().body("OK")
 }
 
-#[put("/world/stats/uptime")]
-pub async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<UptimeInfo>) -> impl Responder {
+#[put("/world/uptime")]
+pub async fn set_uptime(data: web::Data<Mutex<APIData>>, info: web::Json<UptimeInfo>) -> impl Responder {
     let mut apidata = data.lock().unwrap();
 
     if !info.auth.eq(&apidata.auth) {
@@ -70,6 +70,8 @@ pub async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<UptimeInfo>)
     println!("Updating uptime");
 
     db.world.uptime = info.uptime;
+
+    HttpResponse::Ok().body("OK")
 }
 
 #[put("/world/kill")]

@@ -65,7 +65,7 @@ impl World {
             if file.file_type().unwrap().is_file() {
                 if file.path().extension().unwrap().eq("json") {
                     if file.file_name().eq("global.json") {
-                        let global_data: super::Global = serde_json::from_str(&fs::read_to_string(file.path())?);
+                        let global_data: super::Global = serde_json::from_str(&fs::read_to_string(file.path())?)?;
                         world.uptime = global_data.uptime;
                     } else {
                         let data = fs::read_to_string(file.path())?;

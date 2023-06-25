@@ -47,9 +47,9 @@ pub async fn get_all_stats(data: web::Data<Mutex<APIData>>) -> impl Responder {
     HttpResponse::Ok().body(db.get_all_stats().expect("Saved player stats JSON is probably malformed!"))
 }
 
-#[get("world/stats/uptime")]
+#[get("world/uptime")]
 pub async fn get_uptime(data: web::Data<Mutex<APIData>>) -> impl Responder {
     let db = &data.lock().unwrap().database; 
     
-    HttpResponse::Ok().body(db.world.uptime)
+    HttpResponse::Ok().body(db.world.uptime.to_string())
 }
