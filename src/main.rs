@@ -5,8 +5,8 @@ mod db;
 mod putters;
 mod getters;
 
-mod util;
-use util::APIData;
+mod info;
+use info::APIData;
 
 use db::Database;
 
@@ -66,7 +66,7 @@ async fn main() -> std::io::Result<()> {
             .service(putters::create_world)
             .service(putters::switch_world)
             .service(putters::kill_world)
-            .service(putters::set_uptime)
+            .service(putters::update_uptime)
     })
     .bind(("0.0.0.0", 8080))?
     .run()

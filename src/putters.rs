@@ -1,11 +1,11 @@
 use actix_web::{web, put, Responder, HttpResponse};
 use std::{sync::Mutex};
 
-use crate::util::KillInfo;
-use crate::util::UptimeInfo;
-use crate::util::APIData;
-use crate::util::SwitchInfo;
-use crate::util::Info;
+use crate::info::KillInfo;
+use crate::info::UptimeInfo;
+use crate::info::APIData;
+use crate::info::SwitchInfo;
+use crate::info::Info;
 
 
 #[put("/world")]
@@ -58,7 +58,7 @@ pub async fn stats(data: web::Data<Mutex<APIData>>, info: web::Json<Info>, path:
 }
 
 #[put("/world/uptime")]
-pub async fn set_uptime(data: web::Data<Mutex<APIData>>, info: web::Json<UptimeInfo>) -> impl Responder {
+pub async fn update_uptime(data: web::Data<Mutex<APIData>>, info: web::Json<UptimeInfo>) -> impl Responder {
     let mut apidata = data.lock().unwrap();
 
     if !info.auth.eq(&apidata.auth) {
@@ -69,7 +69,7 @@ pub async fn set_uptime(data: web::Data<Mutex<APIData>>, info: web::Json<UptimeI
 
     println!("Updating uptime");
 
-    db.world.uptime = info.uptime;
+    db.world.uptime += info.uptime;
 
     HttpResponse::Ok().body("OK")
 }

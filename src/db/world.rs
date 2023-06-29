@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use actix_web::error;
 
-use crate::util::Info;
+use crate::info::Info;
 use super::cache::ProfileCache;
 
 // Error when attempting to switch to a world that doesn't/hasn't existed 
@@ -33,6 +33,7 @@ pub struct PlayerStats {
     pub display_name: String,
     pub skin_url: String,
     pub time_in_water: u64,
+    pub time_in_nether: u64,
     pub damage_taken: u64,
     pub mobs_killed: u64,
     pub food_eaten: u64,
@@ -105,6 +106,10 @@ impl World {
 
         if let Some(time) = &info.time_in_water {
             stats.time_in_water += time;
+        }
+
+        if let Some(time) = &info.time_in_nether {
+            stats.time_in_nether += time;
         }
 
         if let Some(damage_taken)  = &info.damage_taken {

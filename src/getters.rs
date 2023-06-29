@@ -1,7 +1,7 @@
 use actix_web::{web, get, Responder, HttpResponse};
 use std::{sync::Mutex, time};
 
-use super::util::APIData;
+use super::info::APIData;
 
 #[get("/")]
 pub async fn hello() -> impl Responder {

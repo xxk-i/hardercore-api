@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use world::*;
 
-use super::util::KillInfo;
+use super::info::KillInfo;
 
 #[derive(Serialize, Deserialize)]
 pub struct Global {
@@ -90,10 +90,6 @@ impl Database {
 
         self.create_world()?;
         self.switch_world(self.world_count).expect("Failed to switch to first world in new database");
-
-        // fs::create_dir_all(self.path.clone().join("worlds/world1"))?;
-
-        // self.switch_world(1).expect("Failed to switch to first world in new database");
 
         Ok(())
     }

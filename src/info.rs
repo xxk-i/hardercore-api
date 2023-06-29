@@ -33,6 +33,7 @@ pub struct KillInfo {
 pub struct Info {
     pub auth: String,
     pub time_in_water: Option<u64>,
+    pub time_in_nether: Option<u64>,
     pub damage_taken: Option<u64>,
     pub has_died: Option<bool>,
     pub mobs_killed: Option<u64>,
